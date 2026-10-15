@@ -8,10 +8,7 @@ import {
   Languages,
   HelpCircle,
   Tv,
-  Code2,
-  Terminal,
 } from 'lucide-react';
-import { YoutubeIcon } from './icons';
 
 interface MainWindowBarProps {
   windows: WindowInfo[];
@@ -23,8 +20,6 @@ interface MainWindowBarProps {
   onToggleLang: () => void;
   onOpenML: () => void;
   onOpenAbout: () => void;
-  onOpenYouTubeIssues: () => void;
-  onOpenCodeExplorer: () => void;
   langStrings: Record<string, string>;
   isPipActive: boolean;
   mlSamplesCount: number;
@@ -40,15 +35,13 @@ export const MainWindowBar: React.FC<MainWindowBarProps> = ({
   onToggleLang,
   onOpenML,
   onOpenAbout,
-  onOpenYouTubeIssues,
-  onOpenCodeExplorer,
   langStrings,
   isPipActive,
   mlSamplesCount,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-[#2D2D30] border-b border-[#3e3e42] shadow-xl text-white select-none">
-      <div className="max-w-7xl mx-auto px-4 h-[54px] flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 h-[52px] flex items-center justify-between gap-3">
         {/* Left Side: Windows Title & Grip (matching MainWindow.xaml Label x:Name="drag") */}
         <div className="flex items-center gap-2 shrink-0">
           <div
@@ -65,9 +58,6 @@ export const MainWindowBar: React.FC<MainWindowBarProps> = ({
             <div>
               <span className="font-semibold text-xs sm:text-sm tracking-tight text-white block leading-none">
                 {langStrings.appTitle}
-              </span>
-              <span className="text-[10px] text-sky-400 font-mono tracking-wider">
-                WIN32 · DWM · RUST & ZIG
               </span>
             </div>
           </div>
@@ -93,44 +83,18 @@ export const MainWindowBar: React.FC<MainWindowBarProps> = ({
             </select>
             <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-
-          {/* Process Metadata Tag */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-400 shrink-0">
-            <Terminal className="w-3.5 h-3.5 text-blue-400" />
-            <span>HWND: {selectedWindow.hwnd}</span>
-          </div>
         </div>
 
-        {/* Right Side: Windows Tools & Actions */}
+        {/* Right Side: Essential Actions & Settings */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* YouTube Video Issues & Fixes Button */}
-          <button
-            onClick={onOpenYouTubeIssues}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-950/40 border border-red-700/50 text-red-300 text-xs hover:bg-red-900/50 transition-colors shadow-sm"
-            title="Scraped YouTube Video Comments & Fixed Issues"
-          >
-            <YoutubeIcon className="w-3.5 h-3.5 text-red-400" />
-            <span className="hidden sm:inline font-semibold">YT Fixes (6)</span>
-          </button>
-
-          {/* Rust & Zig Native Codebase Explorer */}
-          <button
-            onClick={onOpenCodeExplorer}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-orange-950/40 border border-orange-700/50 text-orange-300 text-xs hover:bg-orange-900/50 transition-colors shadow-sm"
-            title="View Rust & Zig Native Source Code"
-          >
-            <Code2 className="w-3.5 h-3.5 text-orange-400" />
-            <span className="hidden sm:inline font-semibold">Rust & Zig</span>
-          </button>
-
-          {/* ML Status Badge */}
+          {/* ML Status / Settings */}
           <button
             onClick={onOpenML}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-indigo-950/40 border border-indigo-700/40 text-indigo-300 text-xs hover:bg-indigo-900/50 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-950/40 border border-indigo-700/40 text-indigo-300 text-xs hover:bg-indigo-900/50 transition-colors"
             title={`${langStrings.aiModelTrained} (${mlSamplesCount} ${langStrings.recordsCount})`}
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden xl:inline font-mono">{mlSamplesCount} ML</span>
+            <span className="hidden sm:inline font-mono">{mlSamplesCount} ML</span>
           </button>
 
           {/* Language Switcher */}

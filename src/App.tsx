@@ -9,10 +9,7 @@ import { CropperOverlay } from './components/CropperOverlay';
 import { PiPFloatingWindow } from './components/PiPFloatingWindow';
 import { MLModal } from './components/MLModal';
 import { AboutModal } from './components/AboutModal';
-import { YouTubeIssuesModal } from './components/YouTubeIssuesModal';
-import { CodeExplorerModal } from './components/CodeExplorerModal';
-import { Sparkles, ShieldCheck, Zap } from 'lucide-react';
-import { YoutubeIcon } from './components/icons';
+import { Sparkles } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('en');
@@ -47,8 +44,6 @@ export const App: React.FC = () => {
   // Modals
   const [isMLModalOpen, setIsMLModalOpen] = useState<boolean>(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
-  const [isYouTubeModalOpen, setIsYouTubeModalOpen] = useState<boolean>(false);
-  const [isCodeExplorerOpen, setIsCodeExplorerOpen] = useState<boolean>(false);
 
   // Toast ref to prevent timer race conditions
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,11 +152,7 @@ export const App: React.FC = () => {
       } else if (e.key === 'Escape') {
         e.preventDefault();
         // Dismiss open modals first before closing PiP
-        if (isYouTubeModalOpen) {
-          setIsYouTubeModalOpen(false);
-        } else if (isCodeExplorerOpen) {
-          setIsCodeExplorerOpen(false);
-        } else if (isMLModalOpen) {
+        if (isMLModalOpen) {
           setIsMLModalOpen(false);
         } else if (isAboutModalOpen) {
           setIsAboutModalOpen(false);
@@ -172,15 +163,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    isPipActive,
-    cropRect,
-    selectedWindow,
-    isYouTubeModalOpen,
-    isCodeExplorerOpen,
-    isMLModalOpen,
-    isAboutModalOpen,
-  ]);
+  }, [isPipActive, cropRect, selectedWindow, isMLModalOpen, isAboutModalOpen]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#18181b] overflow-hidden select-none">
@@ -195,8 +178,6 @@ export const App: React.FC = () => {
         onToggleLang={() => setLang((prev) => (prev === 'en' ? 'ru' : 'en'))}
         onOpenML={() => setIsMLModalOpen(true)}
         onOpenAbout={() => setIsAboutModalOpen(true)}
-        onOpenYouTubeIssues={() => setIsYouTubeModalOpen(true)}
-        onOpenCodeExplorer={() => setIsCodeExplorerOpen(true)}
         langStrings={t as any}
         isPipActive={isPipActive}
         mlSamplesCount={mlSamplesCount}
@@ -206,7 +187,7 @@ export const App: React.FC = () => {
       <div className="flex-1 relative overflow-hidden flex items-center justify-center p-4 bg-[#111113]">
         <div
           ref={stageContainerRef}
-          className="relative w-full max-w-6xl aspect-video max-h-[82vh] bg-black rounded-xl overflow-hidden shadow-2xl border border-neutral-800"
+          className="relative w-full max-w-6xl aspect-video max-h-[84vh] bg-black rounded-xl overflow-hidden shadow-2xl border border-neutral-800"
         >
           {/* Active Windows Process Canvas */}
           <WindowContentView
@@ -255,26 +236,6 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Launch Bottom Bar Pill for Windows Community Issues & Native Engines */}
-      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1f1f23]/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-neutral-700 shadow-2xl text-xs">
-        <button
-          onClick={() => setIsYouTubeModalOpen(true)}
-          className="flex items-center gap-1.5 text-neutral-300 hover:text-red-400 font-medium px-2 py-0.5 rounded transition-colors"
-        >
-          <YoutubeIcon className="w-3.5 h-3.5 text-red-500" />
-          <span>YouTube Windows Bugs Audit (6 Fixed)</span>
-        </button>
-        <div className="w-[1px] h-3.5 bg-neutral-700" />
-        <button
-          onClick={() => setIsCodeExplorerOpen(true)}
-          className="flex items-center gap-1.5 text-neutral-300 hover:text-orange-400 font-medium px-2 py-0.5 rounded transition-colors"
-        >
-          <ShieldCheck className="w-3.5 h-3.5 text-orange-400" />
-          <Zap className="w-3.5 h-3.5 text-amber-400" />
-          <span>Windows Rust & Zig Codebase</span>
-        </button>
-      </div>
-
       {/* ML Training Dataset Modal */}
       <MLModal
         isOpen={isMLModalOpen}
@@ -288,18 +249,6 @@ export const App: React.FC = () => {
         isOpen={isAboutModalOpen}
         onClose={() => setIsAboutModalOpen(false)}
         langStrings={t as any}
-      />
-
-      {/* YouTube Scraped Comments & Fixes Modal */}
-      <YouTubeIssuesModal
-        isOpen={isYouTubeModalOpen}
-        onClose={() => setIsYouTubeModalOpen(false)}
-      />
-
-      {/* Rust & Zig Source Code Explorer Modal */}
-      <CodeExplorerModal
-        isOpen={isCodeExplorerOpen}
-        onClose={() => setIsCodeExplorerOpen(false)}
       />
     </div>
   );
