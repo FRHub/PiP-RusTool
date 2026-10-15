@@ -1,0 +1,8 @@
+{
+  "name": "PiP-Tool Web (Picture in Picture & Screen Cropper)",
+  "description": "Web version of PiP-Tool / PiP-RusTool for selecting any window or screen, cropping a region, predicting crop bounds with ML, and floating it in an always-on-top Picture-in-Picture window.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,30 @@
+[package]
+name = "pip-tool-rs"
+version = "2.0.0"
+edition = "2021"
+authors = ["Lionel Jouin", "FRHub", "Community"]
+description = "High-performance Rust rewrite of PiP-Tool with ML region prediction, multi-monitor DPI safety, and ghost click-through mode"
+license = "MIT"
+
+[dependencies]
+# Windows API bindings for DWM and Desktop Duplication / Win32
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_HiDpi",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }
+image = "0.25"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.11"
+parking_lot = "0.12"
+thiserror = "1.0"
+
+[features]
+default = []
+cross-platform = []
