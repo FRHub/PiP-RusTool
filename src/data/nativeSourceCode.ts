@@ -1,6 +1,6 @@
 export interface CodeFile {
   path: string;
-  language: 'rust' | 'zig' | 'toml';
+  language: 'rust' | 'zig' | 'toml' | 'bat' | 'xml';
   title: string;
   description: string;
   content: string;
@@ -11,7 +11,7 @@ export const RUST_FILES: CodeFile[] = [
     path: 'rust/Cargo.toml',
     language: 'toml',
     title: 'Cargo.toml',
-    description: 'Rust package definition and native Windows DWM / image / serde dependencies',
+    description: 'Rust package definition and native Windows Win32 / DWM dependencies',
     content: `[package]
 name = "pip-tool-rs"
 version = "2.0.0"
@@ -34,6 +34,40 @@ serde_json = "1.0"
 log = "0.4"
 env_logger = "0.11"
 parking_lot = "0.12"`,
+  },
+  {
+    path: 'rust/app.manifest',
+    language: 'xml',
+    title: 'app.manifest',
+    description: 'Windows Application Manifest declaring PerMonitorV2 DPI awareness (Prevents @gkillerwog2147 crash)',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="2.0.0.0" name="PiPTool.app"/>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 and Windows 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+  <!-- PerMonitorV2: Fixes multi-monitor moving crashes on Windows 10/11 -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>`,
+  },
+  {
+    path: 'rust/build.bat',
+    language: 'bat',
+    title: 'build.bat',
+    description: 'Windows 64-bit release build script (MSVC)',
+    content: `@echo off
+echo Building PiP-Tool Rust Native Windows Engine (64-bit)...
+cargo build --release --target x86_64-pc-windows-msvc
+echo Binary created at target\\x86_64-pc-windows-msvc\\release\\pip-tool-rs.exe
+pause`,
   },
   {
     path: 'rust/src/geometry.rs',
@@ -109,7 +143,7 @@ impl PipWindow {
     /// Toggles click-through (Ghost Mode for uninterrupted gaming)
     pub fn set_click_through(&mut self, enable: bool) {
         self.config.click_through = enable;
-        // Sets WS_EX_TRANSPARENT in Win32
+        // In Win32: SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_TRANSPARENT)
     }
 
     /// Preset resizing optimized for 1440p / 4K monitors (@Gisborne1990)
@@ -191,6 +225,17 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 }`,
+  },
+  {
+    path: 'zig/build.bat',
+    language: 'bat',
+    title: 'build.bat',
+    description: 'Windows 64-bit compilation script for Zig engine',
+    content: `@echo off
+echo Building PiP-Tool Zig Native Windows Engine...
+zig build -Doptimize=ReleaseFast -Dtarget=x86_64-windows
+echo Binary created at zig-out\\bin\\pip-tool-zig.exe
+pause`,
   },
   {
     path: 'zig/src/geometry.zig',

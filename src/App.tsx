@@ -20,7 +20,6 @@ export const App: React.FC = () => {
 
   const [windows, setWindows] = useState<WindowInfo[]>(PRESET_WINDOWS);
   const [selectedWindow, setSelectedWindow] = useState<WindowInfo>(PRESET_WINDOWS[0]);
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
 
   // Video and canvas references
   const sourceVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -91,51 +90,6 @@ export const App: React.FC = () => {
     showToast(`${t.aiPrediction}: ${prediction.tag} (${Math.round(prediction.confidence * 100)}%)`);
   }, [prediction, t.aiPrediction]);
 
-  // Screen share handler
-  const handleToggleScreenShare = async () => {
-    if (screenStream) {
-      screenStream.getTracks().forEach((track) => track.stop());
-      setScreenStream(null);
-      setWindows((prev) => prev.filter((w) => w.type !== 'screen_share'));
-      setSelectedWindow(PRESET_WINDOWS[0]);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 60 },
-          audio: false,
-        });
-
-        const videoTrack = stream.getVideoTracks()[0];
-        const trackSettings = videoTrack.getSettings();
-        const screenWidth = trackSettings.width || 1920;
-        const screenHeight = trackSettings.height || 1080;
-
-        const screenWindow: WindowInfo = {
-          id: `screen_share_${Date.now()}`,
-          title: videoTrack.label || 'Live Display / Window Capture',
-          program: 'ScreenCapture',
-          type: 'screen_share',
-          width: screenWidth,
-          height: screenHeight,
-          aspectRatio: screenWidth / screenHeight,
-        };
-
-        videoTrack.onended = () => {
-          setScreenStream(null);
-          setWindows((prev) => prev.filter((w) => w.id !== screenWindow.id));
-          setSelectedWindow(PRESET_WINDOWS[0]);
-        };
-
-        setScreenStream(stream);
-        setWindows((prev) => [screenWindow, ...prev.filter((w) => w.type !== 'screen_share')]);
-        setSelectedWindow(screenWindow);
-        showToast(lang === 'ru' ? 'Захват экрана успешно подключен' : 'Display capture active');
-      } catch (err) {
-        console.warn('Screen share cancelled or not permitted:', err);
-      }
-    }
-  };
-
   // Launch PiP and train ML
   const startPipMode = () => {
     const regionStr = `${cropRect.y} ${cropRect.x} ${cropRect.height} ${cropRect.width}`;
@@ -161,7 +115,7 @@ export const App: React.FC = () => {
     }, 3200);
   };
 
-  // Keyboard hotkeys matching PiP-Tool
+  // Keyboard hotkeys matching PiP-Tool Windows App
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -179,16 +133,14 @@ export const App: React.FC = () => {
   }, [isPipActive, cropRect, selectedWindow]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#18181b] overflow-hidden">
-      {/* Top Controller Bar */}
+    <div className="flex flex-col h-screen w-screen bg-[#18181b] overflow-hidden select-none">
+      {/* Windows Native MainWindow Controller Bar */}
       <MainWindowBar
         windows={windows}
         selectedWindow={selectedWindow}
         onSelectWindow={(win) => setSelectedWindow(win)}
         onStartPip={startPipMode}
         onQuit={() => setIsPipActive(false)}
-        isScreenSharing={!!screenStream}
-        onToggleScreenShare={handleToggleScreenShare}
         lang={lang}
         onToggleLang={() => setLang((prev) => (prev === 'en' ? 'ru' : 'en'))}
         onOpenML={() => setIsMLModalOpen(true)}
@@ -200,21 +152,20 @@ export const App: React.FC = () => {
         mlSamplesCount={mlSamplesCount}
       />
 
-      {/* Main Workspace Stage */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center p-4 bg-[#121214]">
+      {/* Main Workspace Stage - Represents the Windows Desktop Window Manager Stage */}
+      <div className="flex-1 relative overflow-hidden flex items-center justify-center p-4 bg-[#111113]">
         <div
           ref={stageContainerRef}
           className="relative w-full max-w-6xl aspect-video max-h-[82vh] bg-black rounded-xl overflow-hidden shadow-2xl border border-neutral-800"
         >
-          {/* Active Window Content Canvas & Video */}
+          {/* Active Windows Process Canvas */}
           <WindowContentView
             windowInfo={selectedWindow}
-            stream={screenStream}
             videoRef={sourceVideoRef}
             canvasRef={sourceCanvasRef}
           />
 
-          {/* Cropper Overlay */}
+          {/* Windows Cropper Overlay */}
           <CropperOverlay
             containerWidth={selectedWindow.width || stageDimensions.width}
             containerHeight={selectedWindow.height || stageDimensions.height}
@@ -227,7 +178,7 @@ export const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Picture in Picture Window */}
+      {/* Floating Picture in Picture Window (Windows TopMost DWM Overlay) */}
       {isPipActive && (
         <PiPFloatingWindow
           cropRect={cropRect}
@@ -254,14 +205,14 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Launch Bottom Bar Pill for YouTube Fixes & Native Engines */}
-      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1f1f23]/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-neutral-700/80 shadow-2xl text-xs">
+      {/* Quick Launch Bottom Bar Pill for Windows Community Issues & Native Engines */}
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1f1f23]/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-neutral-700 shadow-2xl text-xs">
         <button
           onClick={() => setIsYouTubeModalOpen(true)}
           className="flex items-center gap-1.5 text-neutral-300 hover:text-red-400 font-medium px-2 py-0.5 rounded transition-colors"
         >
           <YoutubeIcon className="w-3.5 h-3.5 text-red-500" />
-          <span>YouTube Issues Audit (6 Solved)</span>
+          <span>YouTube Windows Bugs Audit (6 Fixed)</span>
         </button>
         <div className="w-[1px] h-3.5 bg-neutral-700" />
         <button
@@ -270,7 +221,7 @@ export const App: React.FC = () => {
         >
           <ShieldCheck className="w-3.5 h-3.5 text-orange-400" />
           <Zap className="w-3.5 h-3.5 text-amber-400" />
-          <span>Rust & Zig Engines</span>
+          <span>Windows Rust & Zig Codebase</span>
         </button>
       </div>
 

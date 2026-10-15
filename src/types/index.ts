@@ -5,17 +5,22 @@ export interface Rect {
   height: number;
 }
 
-export interface WindowInfo {
+export interface WindowProcessInfo {
   id: string;
+  hwnd: string; // e.g. "0x002A0B42"
+  pid: number;
+  executable: string; // e.g. "chrome.exe"
   title: string;
   program: string;
-  type: 'screen_share' | 'simulated' | 'custom_media';
   width: number;
   height: number;
   icon?: string;
   videoUrl?: string;
   aspectRatio?: number;
 }
+
+// Alias for backwards compatibility across components
+export type WindowInfo = WindowProcessInfo;
 
 export interface WindowData {
   region: string; // "top left height width"

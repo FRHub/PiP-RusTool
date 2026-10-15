@@ -1,16 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { WindowInfo } from '../types';
 
 interface WindowContentViewProps {
   windowInfo: WindowInfo;
-  stream: MediaStream | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
 export const WindowContentView: React.FC<WindowContentViewProps> = ({
   windowInfo,
-  stream,
   videoRef,
   canvasRef,
 }) => {
@@ -19,17 +17,9 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
     64200, 64350, 64180, 64500, 64420, 64600, 64750, 64680, 64820,
   ]);
 
-  // Screen share stream binding
-  useEffect(() => {
-    if (windowInfo.type === 'screen_share' && stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(console.error);
-    }
-  }, [windowInfo, stream, videoRef]);
-
   // Trading view tick animation
   useEffect(() => {
-    if (windowInfo.id !== 'trading_charts') return;
+    if (windowInfo.id !== 'tradingview_app') return;
     const interval = setInterval(() => {
       setStockPrice((prev) => {
         const delta = (Math.random() - 0.48) * 80;
@@ -41,7 +31,7 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
     return () => clearInterval(interval);
   }, [windowInfo.id]);
 
-  // Continuous canvas render for simulated views to feed PiP captureStream
+  // Continuous canvas render for simulated DWM thumbnail surfaces
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -56,13 +46,9 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
       const w = canvas.width;
       const h = canvas.height;
 
-      if (windowInfo.type === 'screen_share' && videoRef.current) {
-        if (videoRef.current.readyState >= 2) {
-          ctx.drawImage(videoRef.current, 0, 0, w, h);
-        }
-      } else if (windowInfo.videoUrl && videoRef.current && videoRef.current.readyState >= 2) {
+      if (windowInfo.videoUrl && videoRef.current && videoRef.current.readyState >= 2) {
         ctx.drawImage(videoRef.current, 0, 0, w, h);
-      } else if (windowInfo.id === 'trading_charts') {
+      } else if (windowInfo.id === 'tradingview_app') {
         // Draw trading chart on canvas
         ctx.fillStyle = '#131722';
         ctx.fillRect(0, 0, w, h);
@@ -88,9 +74,9 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         ctx.fillRect(0, 0, w, 44);
         ctx.fillStyle = '#f0f3fa';
         ctx.font = 'bold 16px sans-serif';
-        ctx.fillText('BTC / USD · 1D · Coinbase', 20, 28);
+        ctx.fillText('BTC / USD · 1D · Coinbase (HWND: ' + windowInfo.hwnd + ')', 20, 28);
         ctx.fillStyle = stockPrice >= 64500 ? '#089981' : '#f23645';
-        ctx.fillText(`$${stockPrice.toLocaleString()}`, 260, 28);
+        ctx.fillText(`$${stockPrice.toLocaleString()}`, 380, 28);
 
         // Draw candlesticks & trend
         const len = stockHistory.length;
@@ -133,7 +119,7 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         ctx.fillStyle = '#ffffff';
         ctx.font = '12px sans-serif';
         ctx.fillText('LIVE', w - 40, 29);
-      } else if (windowInfo.id === 'vscode_ide') {
+      } else if (windowInfo.id === 'vscode_workspace') {
         // VS Code simulated canvas
         ctx.fillStyle = '#1e1e1e';
         ctx.fillRect(0, 0, w, h);
@@ -151,7 +137,7 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         ctx.fillRect(270, 0, 220, 35);
         ctx.fillStyle = '#cccccc';
         ctx.font = '13px monospace';
-        ctx.fillText('MachineLearningService.cs ✕', 285, 22);
+        ctx.fillText('src/window.rs (Rust Engine) ✕', 285, 22);
 
         // Code content
         ctx.fillStyle = '#858585';
@@ -160,45 +146,42 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         }
 
         ctx.fillStyle = '#569cd6';
-        ctx.fillText('namespace', 330, 55 + 18);
+        ctx.fillText('pub struct', 330, 55 + 18);
         ctx.fillStyle = '#4ec9b0';
-        ctx.fillText('PiP_Tool.MachineLearning', 415, 55 + 18);
-
-        ctx.fillStyle = '#569cd6';
-        ctx.fillText('public class', 330, 55 + 54);
-        ctx.fillStyle = '#4ec9b0';
-        ctx.fillText('PredictorModel', 430, 55 + 54);
-
-        ctx.fillStyle = '#569cd6';
-        ctx.fillText('public async Task<Rect>', 350, 55 + 90);
-        ctx.fillStyle = '#dcdcaa';
-        ctx.fillText('PredictRegionAsync', 520, 55 + 90);
+        ctx.fillText('PipWindow', 415, 55 + 18);
         ctx.fillStyle = '#d4d4d4';
-        ctx.fillText('(string program, WindowData data)', 670, 55 + 90);
+        ctx.fillText('{ config: PipWindowConfig }', 500, 55 + 18);
+
+        ctx.fillStyle = '#569cd6';
+        ctx.fillText('impl', 330, 55 + 54);
+        ctx.fillStyle = '#4ec9b0';
+        ctx.fillText('PipWindow', 370, 55 + 54);
+
+        ctx.fillStyle = '#569cd6';
+        ctx.fillText('pub fn', 350, 55 + 90);
+        ctx.fillStyle = '#dcdcaa';
+        ctx.fillText('set_click_through', 405, 55 + 90);
+        ctx.fillStyle = '#d4d4d4';
+        ctx.fillText('(&mut self, enable: bool) {', 545, 55 + 90);
 
         ctx.fillStyle = '#6a9955';
-        ctx.fillText('// Train stochastic dual coordinate ascent classifier', 370, 55 + 126);
+        ctx.fillText('// Set WS_EX_TRANSPARENT on Win32 HWND for FPS gaming', 370, 55 + 126);
 
         ctx.fillStyle = '#c586c0';
-        ctx.fillText('return await', 370, 55 + 162);
-        ctx.fillStyle = '#9cdcfe';
-        ctx.fillText('_mlPipeline', 465, 55 + 162);
-        ctx.fillStyle = '#dcdcaa';
-        ctx.fillText('.TrainAndPredictAsync', 555, 55 + 162);
+        ctx.fillText('self.config.click_through = enable;', 370, 55 + 162);
         ctx.fillStyle = '#d4d4d4';
-        ctx.fillText('(data);', 730, 55 + 162);
+        ctx.fillText('}', 350, 55 + 198);
 
         // Minimap
         ctx.fillStyle = '#252526';
         ctx.fillRect(w - 110, 35, 110, h - 35);
         ctx.fillStyle = '#3a3d41';
         ctx.fillRect(w - 95, 60, 80, 120);
-      } else if (windowInfo.id === 'pdf_blueprint') {
+      } else if (windowInfo.id === 'acrobat_reader') {
         // PDF paper canvas
         ctx.fillStyle = '#525659';
         ctx.fillRect(0, 0, w, h);
 
-        // Paper page
         const pw = 680;
         const ph = h - 60;
         const px = (w - pw) / 2;
@@ -211,19 +194,18 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
 
         ctx.fillStyle = '#111827';
         ctx.font = 'bold 20px serif';
-        ctx.fillText('Deep Learning Region Segmentation in Desktop Compositors', px + 40, py + 50);
+        ctx.fillText('Windows Desktop Window Manager (DWM) Thumbnail Pipeline', px + 40, py + 50);
         ctx.font = 'italic 13px serif';
         ctx.fillStyle = '#4b5563';
-        ctx.fillText('Lionel Jouin, FRHub, Computer Vision & Window Management', px + 40, py + 75);
+        ctx.fillText('Rust and Zig Native Architectural Blueprint', px + 40, py + 75);
 
         ctx.fillStyle = '#1f2937';
         ctx.font = '12px serif';
         const lorem = [
-          'Abstract — Picture-in-picture (PiP) allows users to watch dynamic video',
-          'content while simultaneously engaging with other desktop applications.',
-          'Traditional approaches require manual cropping coordinates. We propose',
-          'a supervised regression model that learns region coordinates (X, Y, W, H)',
-          'from previous user workflows and application metadata.',
+          'Windows DWM API provides direct GPU-backed window composition through',
+          'DwmRegisterThumbnail and DwmUpdateThumbnailProperties. The native Rust',
+          'and Zig engines hook directly into the Win32 Desktop Window Manager,',
+          'delivering zero-copy frame transport and sub-millisecond latency.',
         ];
         lorem.forEach((line, idx) => {
           ctx.fillText(line, px + 40, py + 115 + idx * 18);
@@ -233,18 +215,18 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         ctx.strokeStyle = '#3b82f6';
         ctx.fillStyle = '#eff6ff';
         ctx.lineWidth = 2;
-        ctx.fillRect(px + 40, py + 230, 280, 140);
-        ctx.strokeRect(px + 40, py + 230, 280, 140);
+        ctx.fillRect(px + 40, py + 230, 300, 140);
+        ctx.strokeRect(px + 40, py + 230, 300, 140);
 
         ctx.fillStyle = '#1d4ed8';
         ctx.font = 'bold 12px sans-serif';
-        ctx.fillText('DWM Thumbnail Surface Pipeline', px + 55, py + 260);
+        ctx.fillText('Win32 DWM Thumbnail Architecture', px + 55, py + 260);
 
         ctx.fillStyle = '#374151';
         ctx.font = '11px sans-serif';
-        ctx.fillText('• DwmRegisterThumbnail()', px + 65, py + 290);
-        ctx.fillText('• DwmUpdateThumbnailProperties()', px + 65, py + 310);
-        ctx.fillText('• Crop Rect: [Left, Top, Width, Height]', px + 65, py + 330);
+        ctx.fillText('• dwmapi!DwmRegisterThumbnail()', px + 65, py + 290);
+        ctx.fillText('• user32!SetWindowLongPtr(WS_EX_TRANSPARENT)', px + 65, py + 310);
+        ctx.fillText('• user32!SetProcessDpiAwarenessContext()', px + 65, py + 330);
       }
 
       animId = requestAnimationFrame(render);
@@ -264,7 +246,7 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         className="w-full h-full object-contain block bg-[#09090b]"
       />
 
-      {/* Hidden Video element for video playback or screen capture */}
+      {/* Hidden Video element for video playback */}
       <video
         ref={videoRef}
         src={windowInfo.videoUrl}

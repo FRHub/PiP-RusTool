@@ -4,7 +4,6 @@ import {
   X,
   RotateCcw,
   Maximize2,
-  ExternalLink,
   Lock,
   Unlock,
   Sliders,
@@ -50,7 +49,6 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   title,
 }) => {
   const pipCanvasRef = useRef<HTMLCanvasElement>(null);
-  const hiddenVideoRef = useRef<HTMLVideoElement>(null);
 
   // Floating window position & size state
   const [width, setWidth] = useState(480);
@@ -63,8 +61,8 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   const [opacity, setOpacity] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
 
-  // YouTube comment solutions state:
-  // 1. Ghost / Click-Through Mode (@nemurishivasai4765 FPS gamer)
+  // Solved YouTube issues:
+  // 1. Ghost / Click-Through Mode (@nemurishivasai4765 FPS gamer) -> WS_EX_TRANSPARENT
   const [isGhostMode, setIsGhostMode] = useState(false);
   // 2. Interactive Media Controls (@Fanceh)
   const [isPlaying, setIsPlaying] = useState(true);
@@ -84,7 +82,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
 
   const aspectRatio = cropRect.width / Math.max(1, cropRect.height);
 
-  // Keyboard shortcut: Alt+G to toggle Ghost Mode for FPS gamers
+  // Keyboard shortcut: Alt+G to toggle Windows Ghost Mode for FPS gamers
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.altKey && (e.key === 'g' || e.key === 'G' || e.key === 'п' || e.key === 'П')) {
@@ -134,7 +132,6 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
     const targetH = Math.round(targetW / aspectRatio);
     setWidth(targetW);
     setHeight(targetH);
-    // Boundary check so window doesn't fall off screen
     setPos((prev) => ({
       x: Math.max(10, Math.min(window.innerWidth - targetW - 10, prev.x)),
       y: Math.max(50, Math.min(window.innerHeight - targetH - 10, prev.y)),
@@ -153,7 +150,6 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
     const drawCroppedFrame = () => {
       const srcCanvas = sourceCanvasRef.current;
       if (srcCanvas && srcCanvas.width > 0 && srcCanvas.height > 0) {
-        // Scaled coordinates
         const scaleX = srcCanvas.width / Math.max(1, sourceWidth);
         const scaleY = srcCanvas.height / Math.max(1, sourceHeight);
 
@@ -188,28 +184,6 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
     drawCroppedFrame();
     return () => cancelAnimationFrame(animId);
   }, [cropRect, sourceCanvasRef, sourceWidth, sourceHeight, zoomLevel]);
-
-  // Request native OS Picture-in-Picture
-  const requestNativePiP = async () => {
-    const pipCanvas = pipCanvasRef.current;
-    const video = hiddenVideoRef.current;
-    if (!pipCanvas || !video) return;
-
-    try {
-      // @ts-ignore
-      const stream = pipCanvas.captureStream?.(60) || (pipCanvas as any).mozCaptureStream?.(60);
-      if (stream) {
-        video.srcObject = stream;
-        await video.play();
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        }
-        await video.requestPictureInPicture();
-      }
-    } catch (err) {
-      console.warn('Native Picture in Picture could not be opened:', err);
-    }
-  };
 
   // Dragging logic with multi-monitor clamping (Fix for @gkillerwog2147)
   const onPointerDownDrag = (e: React.PointerEvent) => {
@@ -300,11 +274,11 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
 
   return (
     <>
-      {/* Ghost Mode Active Floating Banner (Allows user to exit ghost mode without needing hotkey) */}
+      {/* Windows Ghost Mode Active Banner */}
       {isGhostMode && (
         <div className="fixed top-16 right-6 z-50 bg-amber-950/90 border border-amber-600 text-amber-200 px-3.5 py-2 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs animate-pulse">
           <Ghost className="w-4 h-4 text-amber-400" />
-          <span>Ghost Mode Active (Clicks pass to game)</span>
+          <span>Windows Ghost Mode Active (WS_EX_TRANSPARENT · Clicks pass to game)</span>
           <button
             onClick={() => setIsGhostMode(false)}
             className="ml-2 bg-amber-500 text-black px-2 py-0.5 rounded font-bold hover:bg-amber-400 text-[11px]"
@@ -334,10 +308,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
           opacity,
         }}
       >
-        {/* Hidden video element for native OS PiP streaming */}
-        <video ref={hiddenVideoRef} muted autoPlay playsInline className="hidden" />
-
-        {/* Main Canvas rendering cropped sub-region */}
+        {/* Main Canvas rendering cropped sub-region via DWM */}
         <canvas
           ref={pipCanvasRef}
           width={cropRect.width || 400}
@@ -400,7 +371,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
             <button
               onClick={() => setIsGhostMode(true)}
               className="p-1.5 rounded text-amber-300 hover:text-amber-200 hover:bg-amber-950/50 transition-colors"
-              title="Ghost Mode (Click-Through for FPS Gaming) [Alt+G]"
+              title="Ghost Mode (WS_EX_TRANSPARENT - Click-Through for FPS Gaming) [Alt+G]"
             >
               <Ghost className="w-3.5 h-3.5" />
             </button>
@@ -420,18 +391,9 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
             <button
               onClick={() => setShowSettings(!showSettings)}
               className="p-1.5 rounded text-neutral-300 hover:text-white hover:bg-white/10"
-              title="Window Scale & Opacity"
+              title="Windows Scale & Opacity"
             >
               <Sliders className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Native OS Desktop Picture-in-Picture */}
-            <button
-              onClick={requestNativePiP}
-              className="p-1.5 rounded text-neutral-300 hover:text-white hover:bg-white/10"
-              title={langStrings.popoutDesktop}
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
             </button>
 
             {/* Re-Crop current window */}
@@ -463,7 +425,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
           </div>
         </div>
 
-        {/* Bottom Hover Interactive Media Bar (Fix for @Fanceh: interactive controls in PiP) */}
+        {/* Bottom Hover Interactive Media Bar (Fix for @Fanceh) */}
         <div
           className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 transition-all duration-200 flex items-center justify-between ${
             isHovered && !isGhostMode ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
