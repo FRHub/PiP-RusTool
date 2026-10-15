@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Rect, RegionPrediction } from '../types';
-import { Sparkles, Maximize2, Move, Ratio } from 'lucide-react';
+import { Sparkles, Move } from 'lucide-react';
 
 interface CropperOverlayProps {
   containerWidth: number;
@@ -148,27 +148,6 @@ export const CropperOverlay: React.FC<CropperOverlayProps> = ({
     }
   };
 
-  // Preset aspect ratio quick application with full coordinate boundary check
-  const applyPresetRatio = (ratioW: number, ratioH: number) => {
-    const targetRatio = ratioW / ratioH;
-    let w = Math.min(containerWidth, Math.max(60, cropRect.width));
-    let h = Math.round(w / targetRatio);
-    let x = cropRect.x;
-    let y = cropRect.y;
-
-    if (h > containerHeight) {
-      h = containerHeight;
-      w = Math.round(h * targetRatio);
-    }
-    if (x + w > containerWidth) {
-      x = Math.max(0, containerWidth - w);
-    }
-    if (y + h > containerHeight) {
-      y = Math.max(0, containerHeight - h);
-    }
-    onChangeCropRect(clampRect({ x, y, width: w, height: h }));
-  };
-
   const currentRatio = (cropRect.width / Math.max(1, cropRect.height)).toFixed(2);
 
   // Percentage styles for CSS rendering
@@ -235,8 +214,8 @@ export const CropperOverlay: React.FC<CropperOverlayProps> = ({
           <div className="border-r border-b border-blue-300/40" />
           <div className="border-r border-b border-blue-300/40" />
           <div className="border-b border-blue-300/40" />
-          <div className="border-r border-blue-300/40" />
-          <div className="border-r border-blue-300/40" />
+          <div className="border-r border-b border-blue-300/40" />
+          <div className="border-r border-b border-blue-300/40" />
           <div />
         </div>
 
@@ -248,11 +227,27 @@ export const CropperOverlay: React.FC<CropperOverlayProps> = ({
           </div>
         </div>
 
-        {/* Info Coordinate Badge */}
-        <div className="absolute -top-9 left-0 bg-neutral-900/90 backdrop-blur-md px-2.5 py-1 rounded text-[11px] font-mono text-neutral-200 border border-neutral-700/80 flex items-center gap-2 pointer-events-none shadow-lg whitespace-nowrap">
-          <span className="text-blue-400 font-semibold">{cropRect.width} × {cropRect.height}</span>
-          <span className="text-neutral-400">({cropRect.x}, {cropRect.y})</span>
-          <span className="text-emerald-400 bg-emerald-950/60 px-1 rounded">{currentRatio}:1</span>
+        {/* Info Coordinate Badge & AI Smart Crop trigger */}
+        <div className="absolute -top-9 left-0 flex items-center gap-2 pointer-events-auto shadow-lg whitespace-nowrap">
+          <div className="bg-neutral-900/90 backdrop-blur-md px-2.5 py-1 rounded text-[11px] font-mono text-neutral-200 border border-neutral-700/80 flex items-center gap-2 pointer-events-none">
+            <span className="text-blue-400 font-semibold">{cropRect.width} × {cropRect.height}</span>
+            <span className="text-neutral-400">({cropRect.x}, {cropRect.y})</span>
+            <span className="text-emerald-400 bg-emerald-950/60 px-1 rounded">{currentRatio}:1</span>
+          </div>
+
+          {prediction && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onApplyPrediction();
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-blue-600/90 hover:bg-blue-500 text-white text-[11px] font-medium border border-blue-400/50 shadow-md transition-all active:scale-95"
+              title={`${prediction.tag} (${Math.round(prediction.confidence * 100)}% confidence)`}
+            >
+              <Sparkles className="w-3 h-3 text-yellow-300 animate-pulse" />
+              <span>{langStrings.aiPrediction || 'AI Crop'}</span>
+            </button>
+          )}
         </div>
 
         {/* 8 Corner and Edge Resize Handles */}
@@ -288,66 +283,6 @@ export const CropperOverlay: React.FC<CropperOverlayProps> = ({
           onPointerDown={(e) => handlePointerDown(e, 'left')}
           className="absolute top-1/2 -left-2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-blue-500 rounded-sm cursor-ew-resize shadow-md hover:scale-125 transition-transform"
         />
-      </div>
-
-      {/* Floating Toolbar at the bottom for quick preset crops and AI prediction */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-neutral-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-neutral-700/80 shadow-2xl flex items-center gap-2 pointer-events-auto">
-        {prediction && (
-          <button
-            onClick={onApplyPrediction}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md transition-all active:scale-95"
-            title={`${prediction.tag} (${Math.round(prediction.confidence * 100)}% confidence)`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
-            <span>{langStrings.aiPrediction || 'AI Smart Crop'}</span>
-            <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded text-blue-100">
-              {Math.round(prediction.confidence * 100)}%
-            </span>
-          </button>
-        )}
-
-        <div className="h-5 w-[1px] bg-neutral-700 mx-1" />
-
-        <button
-          onClick={() => applyPresetRatio(16, 9)}
-          className="px-2.5 py-1 text-xs rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors flex items-center gap-1 font-mono"
-          title="Aspect Ratio 16:9"
-        >
-          <Ratio className="w-3 h-3 text-neutral-400" />
-          16:9
-        </button>
-
-        <button
-          onClick={() => applyPresetRatio(4, 3)}
-          className="px-2.5 py-1 text-xs rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors font-mono"
-          title="Aspect Ratio 4:3"
-        >
-          4:3
-        </button>
-
-        <button
-          onClick={() => applyPresetRatio(1, 1)}
-          className="px-2.5 py-1 text-xs rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors font-mono"
-          title="Aspect Ratio 1:1"
-        >
-          1:1
-        </button>
-
-        <button
-          onClick={() =>
-            onChangeCropRect({
-              x: 0,
-              y: 0,
-              width: containerWidth,
-              height: containerHeight,
-            })
-          }
-          className="px-2.5 py-1 text-xs rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors flex items-center gap-1"
-          title="Full Window"
-        >
-          <Maximize2 className="w-3 h-3 text-neutral-400" />
-          {langStrings.resetCrop || 'Full'}
-        </button>
       </div>
     </div>
   );

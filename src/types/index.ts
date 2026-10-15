@@ -31,6 +31,7 @@ export interface WindowData {
   windowHeight: number;
   windowWidth: number;
   timestamp?: number;
+  isFavorite?: boolean;
 }
 
 export interface RegionPrediction {

@@ -119,6 +119,48 @@ class MachineLearningService {
     this.saveData();
   }
 
+  public isFavorite(program: string): boolean {
+    const p = (program || '').toLowerCase();
+    return this.data.some((item) => item.isFavorite && (item.program || '').toLowerCase() === p);
+  }
+
+  public toggleFavorite(
+    program: string,
+    windowTitle: string,
+    rect: { x: number; y: number; width: number; height: number },
+    winW: number,
+    winH: number
+  ): boolean {
+    const p = (program || '').toLowerCase();
+    const existingIndex = this.data.findIndex(
+      (item) => item.isFavorite && (item.program || '').toLowerCase() === p
+    );
+
+    if (existingIndex !== -1) {
+      // Remove favorite
+      this.data.splice(existingIndex, 1);
+      this.saveData();
+      return false;
+    } else {
+      // Add favorite at top with isFavorite: true
+      const regionStr = `${rect.y} ${rect.x} ${rect.height} ${rect.width}`;
+      const entry: WindowData = {
+        region: regionStr,
+        program,
+        windowTitle,
+        windowTop: 0,
+        windowLeft: 0,
+        windowHeight: winH,
+        windowWidth: winW,
+        timestamp: Date.now(),
+        isFavorite: true,
+      };
+      this.data.unshift(entry);
+      this.saveData();
+      return true;
+    }
+  }
+
   public addData(
     regionStr: string,
     program: string,
@@ -154,21 +196,36 @@ class MachineLearningService {
     const winW = Math.max(100, windowInfo.width || 1280);
     const winH = Math.max(100, windowInfo.height || 720);
 
-    if (!this.data.length) {
-      const w = Math.round(winW * 0.75);
-      const h = Math.round(w * (9 / 16));
-      return {
-        top: Math.max(10, Math.round((winH - h) / 2)),
-        left: Math.max(10, Math.round((winW - w) / 2)),
-        width: Math.min(winW - 20, w),
-        height: Math.min(winH - 20, h),
-        confidence: 0.7,
-        tag: 'Default Center 16:9',
-      };
-    }
-
     const targetProg = (windowInfo.program || '').toLowerCase();
     const targetTitle = (windowInfo.title || '').toLowerCase();
+
+    // 1. Check for user-saved FAVORITE crop for this app first!
+    const favoriteMatch = this.data.find(
+      (item) => item.isFavorite && (item.program || '').toLowerCase() === targetProg
+    );
+
+    if (favoriteMatch) {
+      const parts = (favoriteMatch.region || '').trim().split(/\s+/).map(Number);
+      if (parts.length === 4 && !parts.some(isNaN)) {
+        const [mTop, mLeft, mHeight, mWidth] = parts;
+        const scaleX = winW / Math.max(1, favoriteMatch.windowWidth);
+        const scaleY = winH / Math.max(1, favoriteMatch.windowHeight);
+
+        const scaledW = Math.max(60, Math.min(winW, Math.round(mWidth * scaleX)));
+        const scaledH = Math.max(60, Math.min(winH, Math.round(mHeight * scaleY)));
+        const scaledLeft = Math.max(0, Math.min(winW - scaledW, Math.round(mLeft * scaleX)));
+        const scaledTop = Math.max(0, Math.min(winH - scaledH, Math.round(mTop * scaleY)));
+
+        return {
+          top: scaledTop,
+          left: scaledLeft,
+          height: scaledH,
+          width: scaledW,
+          confidence: 1.0,
+          tag: 'Favorite Crop (Auto-Applied)',
+        };
+      }
+    }
 
     // Check direct matching program
     let bestMatch: WindowData | null = null;

@@ -11,6 +11,7 @@ pub const Sample = struct {
     region: Rect,
     program: []const u8,
     title: []const u8,
+    is_favorite: bool = false,
 };
 
 pub const MachineLearningService = struct {
@@ -33,12 +34,33 @@ pub const MachineLearningService = struct {
             .region = rect,
             .program = program,
             .title = title,
+            .is_favorite = false,
+        });
+    }
+
+    pub fn addFavorite(self: *MachineLearningService, rect: Rect, program: []const u8, title: []const u8) !void {
+        try self.samples.append(.{
+            .region = rect,
+            .program = program,
+            .title = title,
+            .is_favorite = true,
         });
     }
 
     pub fn predict(self: *MachineLearningService, program: []const u8, title: []const u8, win_w: i32, win_h: i32) Prediction {
         _ = title;
-        // Search matching program in history
+        // 1. Check favorite crop first
+        for (self.samples.items) |s| {
+            if (s.is_favorite and std.mem.eql(u8, s.program, program)) {
+                return .{
+                    .rect = s.region,
+                    .confidence = 1.0,
+                    .tag = "Zig ML: Favorite Crop",
+                };
+            }
+        }
+
+        // 2. Search matching program in history
         for (self.samples.items) |s| {
             if (std.mem.eql(u8, s.program, program)) {
                 return .{

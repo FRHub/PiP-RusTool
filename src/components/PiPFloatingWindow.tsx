@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Rect, PiPPosition } from '../types';
+import { mlService } from '../services/MachineLearningService';
 import {
   X,
   RotateCcw,
@@ -21,6 +22,9 @@ import {
   RotateCw as FastForward10,
   ZoomIn,
   Monitor,
+  Star,
+  ScanLine,
+  AppWindow,
 } from 'lucide-react';
 
 interface PiPFloatingWindowProps {
@@ -32,8 +36,11 @@ interface PiPFloatingWindowProps {
   onClose: () => void;
   onReCrop: () => void;
   onChangeWindow: () => void;
+  onResetCrop: () => void;
+  program: string;
   langStrings: Record<string, string>;
   title: string;
+  onNotify?: (msg: string) => void;
 }
 
 export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
@@ -45,8 +52,11 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   onClose,
   onReCrop,
   onChangeWindow,
+  onResetCrop,
+  program,
   langStrings,
   title,
+  onNotify,
 }) => {
   const pipCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -60,6 +70,15 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   const [lockRatio, setLockRatio] = useState(true);
   const [opacity, setOpacity] = useState(1);
   const [showSettings, setShowSettings] = useState(false);
+  const [showResolutionMenu, setShowResolutionMenu] = useState(false);
+
+  // ML Favorite Crop state (Star/Heart icon)
+  const [isFav, setIsFav] = useState(() => mlService.isFavorite(program));
+
+  // Sync favorite state when program changes
+  useEffect(() => {
+    setIsFav(mlService.isFavorite(program));
+  }, [program]);
 
   // Solved YouTube issues:
   // 1. Ghost / Click-Through Mode (@nemurishivasai4765 FPS gamer) -> WS_EX_TRANSPARENT
@@ -127,7 +146,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
     snapToCorner('bottomRight');
   }, []);
 
-  // Apply Resolution Presets (Fix for @Gisborne1990: 1440p / 4K tiny size issue)
+  // Apply Resolution Presets
   const applyPresetSize = (targetW: number) => {
     const targetH = Math.round(targetW / aspectRatio);
     setWidth(targetW);
@@ -136,6 +155,20 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
       x: Math.max(10, Math.min(window.innerWidth - targetW - 10, prev.x)),
       y: Math.max(50, Math.min(window.innerHeight - targetH - 10, prev.y)),
     }));
+    setShowResolutionMenu(false);
+  };
+
+  // Toggle Favorite Crop into ML database
+  const handleToggleFavorite = () => {
+    const newFav = mlService.toggleFavorite(program, title, cropRect, sourceWidth, sourceHeight);
+    setIsFav(newFav);
+    if (onNotify) {
+      onNotify(
+        newFav
+          ? `⭐ Saved ${program} crop as favorite! Next time it will automatically auto-crop here.`
+          : `Removed favorite crop for ${program}.`
+      );
+    }
   };
 
   // Refs for high-frequency animation loop to prevent effect teardown thrashing
@@ -200,7 +233,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   // Dragging logic with multi-monitor clamping (Fix for @gkillerwog2147)
   const onPointerDownDrag = (e: React.PointerEvent) => {
     e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     isDraggingRef.current = true;
     dragStartRef.current = {
       mouseX: e.clientX,
@@ -215,7 +248,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   const onPointerDownResize = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     isResizingRef.current = true;
     dragStartRef.current = {
       mouseX: e.clientX,
@@ -311,6 +344,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
         onMouseLeave={() => {
           setIsHovered(false);
           setShowSettings(false);
+          setShowResolutionMenu(false);
         }}
         className={`fixed z-40 rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-neutral-700/80 bg-[#1e1e24] transition-opacity select-none group ${
           isGhostMode ? 'pointer-events-none ring-2 ring-amber-500/50' : 'pointer-events-auto'
@@ -331,8 +365,8 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
           className="w-full h-full object-cover block bg-black"
         />
 
-        {/* Hover TopBar matching PiP-Tool WPF PiPModeWindow:
-            TopBarVisibility activates on mouse enter */}
+        {/* Hover TopBar:
+            Reveals on mouse enter with Star Favorite, Screen Resolution, Reset Crop, and Window Controls */}
         <div
           className={`absolute top-0 inset-x-0 bg-gradient-to-b from-black/90 via-black/60 to-transparent p-2 transition-all duration-200 flex items-center justify-between ${
             isHovered && !isGhostMode ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
@@ -350,6 +384,48 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* 1. ML Favorite Crop Icon (Star): Save as favorite crop so next time it automatically crops */}
+            <button
+              onClick={handleToggleFavorite}
+              className={`p-1.5 rounded transition-all active:scale-95 ${
+                isFav
+                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/40'
+                  : 'text-neutral-400 hover:text-yellow-300 hover:bg-white/10'
+              }`}
+              title={
+                isFav
+                  ? 'Favorited Crop (Auto-applies next time - Click to remove)'
+                  : 'Save Crop as Favorite (Auto-crops this app next time)'
+              }
+            >
+              <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-yellow-400' : ''}`} />
+            </button>
+
+            {/* 2. Screen Resolution & Presets Icon */}
+            <button
+              onClick={() => {
+                setShowResolutionMenu(!showResolutionMenu);
+                setShowSettings(false);
+              }}
+              className={`p-1.5 rounded transition-colors ${
+                showResolutionMenu
+                  ? 'bg-blue-600 text-white'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/10'
+              }`}
+              title="Screen Resolution & Presets (320p, 480p, 640p, 1440p, 4K)"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+            </button>
+
+            {/* 3. Reset Crop Icon: Resets crop back to full window */}
+            <button
+              onClick={onResetCrop}
+              className="p-1.5 rounded text-neutral-300 hover:text-white hover:bg-white/10 transition-colors"
+              title="Reset Crop to Full Window"
+            >
+              <ScanLine className="w-3.5 h-3.5" />
+            </button>
+
             {/* Quick Corner Snap */}
             <div className="flex items-center bg-black/40 rounded p-0.5 border border-white/10">
               <button
@@ -382,16 +458,16 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
               </button>
             </div>
 
-            {/* Ghost / Click-Through Mode Toggle (Fix for @nemurishivasai4765 FPS gamer) */}
+            {/* Ghost Mode Toggle (WS_EX_TRANSPARENT) */}
             <button
               onClick={() => setIsGhostMode(true)}
               className="p-1.5 rounded text-amber-300 hover:text-amber-200 hover:bg-amber-950/50 transition-colors"
-              title="Ghost Mode (WS_EX_TRANSPARENT - Click-Through for FPS Gaming) [Alt+G]"
+              title="Ghost Mode (WS_EX_TRANSPARENT - Click-Through for Gaming) [Alt+G]"
             >
               <Ghost className="w-3.5 h-3.5" />
             </button>
 
-            {/* Toggle Lock Ratio */}
+            {/* Lock Ratio */}
             <button
               onClick={() => setLockRatio(!lockRatio)}
               className={`p-1.5 rounded transition-colors ${
@@ -402,11 +478,14 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
               {lockRatio ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Settings / Size / Opacity */}
+            {/* Opacity Settings */}
             <button
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => {
+                setShowSettings(!showSettings);
+                setShowResolutionMenu(false);
+              }}
               className="p-1.5 rounded text-neutral-300 hover:text-white hover:bg-white/10"
-              title="Windows Scale & Opacity"
+              title="Window Opacity"
             >
               <Sliders className="w-3.5 h-3.5" />
             </button>
@@ -426,10 +505,10 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
               className="p-1.5 rounded text-neutral-300 hover:text-white hover:bg-white/10"
               title={langStrings.selectNewWindow}
             >
-              <Maximize2 className="w-3.5 h-3.5" />
+              <AppWindow className="w-3.5 h-3.5" />
             </button>
 
-            {/* Quit / Close PiP (matching ButtonQuit in WPF) */}
+            {/* Close PiP */}
             <button
               onClick={onClose}
               className="p-1.5 rounded bg-red-600/80 hover:bg-red-600 text-white shadow-sm"
@@ -440,7 +519,86 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
           </div>
         </div>
 
-        {/* Bottom Hover Interactive Media Bar (Fix for @Fanceh) */}
+        {/* Floating Screen Resolution Presets Popover (Triggered by Monitor Icon) */}
+        {showResolutionMenu && (
+          <div className="absolute top-11 right-12 bg-neutral-900/95 backdrop-blur-md p-3 rounded-xl border border-neutral-700 shadow-2xl z-30 flex flex-col gap-2 w-52 text-xs">
+            <div className="flex items-center justify-between text-[11px] text-neutral-300 border-b border-neutral-800 pb-1.5">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Monitor className="w-3.5 h-3.5 text-blue-400" />
+                Screen Resolution
+              </span>
+              <span className="font-mono text-blue-400">{width}px</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 pt-1">
+              <button
+                onClick={() => applyPresetSize(320)}
+                className={`py-1.5 px-2 text-[11px] rounded font-semibold transition-colors flex items-center justify-between ${
+                  width === 320 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                }`}
+              >
+                <span>Small</span>
+                <span className="font-mono text-[10px] opacity-70">320p</span>
+              </button>
+              <button
+                onClick={() => applyPresetSize(480)}
+                className={`py-1.5 px-2 text-[11px] rounded font-semibold transition-colors flex items-center justify-between ${
+                  width === 480 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                }`}
+              >
+                <span>Medium</span>
+                <span className="font-mono text-[10px] opacity-70">480p</span>
+              </button>
+              <button
+                onClick={() => applyPresetSize(640)}
+                className={`py-1.5 px-2 text-[11px] rounded font-semibold transition-colors flex items-center justify-between ${
+                  width === 640 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                }`}
+              >
+                <span>Large</span>
+                <span className="font-mono text-[10px] opacity-70">640p</span>
+              </button>
+              <button
+                onClick={() => applyPresetSize(850)}
+                className={`py-1.5 px-2 text-[11px] rounded font-semibold transition-colors flex items-center justify-between ${
+                  width === 850 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                }`}
+              >
+                <span>1440p QHD</span>
+                <span className="font-mono text-[10px] opacity-70">850p</span>
+              </button>
+              <button
+                onClick={() => applyPresetSize(1100)}
+                className={`py-1.5 px-2 text-[11px] rounded font-semibold transition-colors col-span-2 flex items-center justify-between ${
+                  width === 1100 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                }`}
+              >
+                <span>4K Ultra HD</span>
+                <span className="font-mono text-[10px] opacity-70">1100p</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Opacity Slider Popup */}
+        {showSettings && (
+          <div className="absolute top-11 right-12 bg-neutral-900/95 backdrop-blur-md p-3 rounded-xl border border-neutral-700 shadow-2xl z-30 flex flex-col gap-2 w-48 text-xs">
+            <div className="flex justify-between items-center text-[11px] text-neutral-300">
+              <span>{langStrings.opacity}:</span>
+              <span className="font-mono text-blue-400">{Math.round(opacity * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.2"
+              max="1"
+              step="0.05"
+              value={opacity}
+              onChange={(e) => setOpacity(parseFloat(e.target.value))}
+              className="w-full accent-blue-500 h-1.5 bg-neutral-700 rounded cursor-pointer"
+            />
+          </div>
+        )}
+
+        {/* Bottom Hover Interactive Media Bar */}
         <div
           className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 transition-all duration-200 flex items-center justify-between ${
             isHovered && !isGhostMode ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
@@ -493,72 +651,6 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
             <span className="font-mono text-[10px] w-6">{zoomLevel.toFixed(1)}x</span>
           </div>
         </div>
-
-        {/* Floating Settings & HiDPI Scale popup (Fix for @Gisborne1990: 1440p / 4K tiny size) */}
-        {showSettings && (
-          <div className="absolute top-11 right-2 bg-neutral-900/95 backdrop-blur-md p-3 rounded-xl border border-neutral-700 shadow-2xl z-30 flex flex-col gap-3 w-56">
-            <div>
-              <div className="flex items-center justify-between text-[11px] text-neutral-300 mb-1.5">
-                <span className="font-semibold flex items-center gap-1">
-                  <Monitor className="w-3.5 h-3.5 text-blue-400" />
-                  HiDPI Sizing Presets:
-                </span>
-                <span className="font-mono text-blue-400">{width}px</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                <button
-                  onClick={() => applyPresetSize(320)}
-                  className={`py-1 text-[10px] rounded font-semibold transition-colors ${
-                    width === 320 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                  }`}
-                >
-                  S (320)
-                </button>
-                <button
-                  onClick={() => applyPresetSize(480)}
-                  className={`py-1 text-[10px] rounded font-semibold transition-colors ${
-                    width === 480 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                  }`}
-                >
-                  M (480)
-                </button>
-                <button
-                  onClick={() => applyPresetSize(640)}
-                  className={`py-1 text-[10px] rounded font-semibold transition-colors ${
-                    width === 640 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                  }`}
-                >
-                  L (640)
-                </button>
-                <button
-                  onClick={() => applyPresetSize(850)}
-                  className={`py-1 text-[10px] rounded font-semibold transition-colors ${
-                    width === 850 ? 'bg-blue-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                  }`}
-                  title="Optimized for 1440p / 4K Displays"
-                >
-                  1440p
-                </button>
-              </div>
-            </div>
-
-            <div className="border-t border-neutral-800 pt-2">
-              <div className="flex justify-between items-center text-[11px] text-neutral-300 mb-1">
-                <span>{langStrings.opacity}:</span>
-                <span className="font-mono text-blue-400">{Math.round(opacity * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.2"
-                max="1"
-                step="0.05"
-                value={opacity}
-                onChange={(e) => setOpacity(parseFloat(e.target.value))}
-                className="w-full accent-blue-500 h-1.5 bg-neutral-700 rounded cursor-pointer"
-              />
-            </div>
-          </div>
-        )}
 
         {/* Resize Grip Corner at Bottom Right */}
         <div
