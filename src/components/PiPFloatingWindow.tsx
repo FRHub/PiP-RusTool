@@ -138,6 +138,14 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
     }));
   };
 
+  // Refs for high-frequency animation loop to prevent effect teardown thrashing
+  const cropRectRef = useRef(cropRect);
+  cropRectRef.current = cropRect;
+  const zoomLevelRef = useRef(zoomLevel);
+  zoomLevelRef.current = zoomLevel;
+  const sourceDimsRef = useRef({ width: sourceWidth, height: sourceHeight });
+  sourceDimsRef.current = { width: sourceWidth, height: sourceHeight };
+
   // Continuous rendering of the cropped sub-region with zoom support
   useEffect(() => {
     const destCanvas = pipCanvasRef.current;
@@ -149,19 +157,23 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
 
     const drawCroppedFrame = () => {
       const srcCanvas = sourceCanvasRef.current;
+      const curCrop = cropRectRef.current;
+      const curZoom = zoomLevelRef.current;
+      const curDims = sourceDimsRef.current;
+
       if (srcCanvas && srcCanvas.width > 0 && srcCanvas.height > 0) {
-        const scaleX = srcCanvas.width / Math.max(1, sourceWidth);
-        const scaleY = srcCanvas.height / Math.max(1, sourceHeight);
+        const scaleX = srcCanvas.width / Math.max(1, curDims.width);
+        const scaleY = srcCanvas.height / Math.max(1, curDims.height);
 
         // Apply digital zoom
-        const zoomFactor = Math.max(1, zoomLevel);
-        const effectiveCropW = cropRect.width / zoomFactor;
-        const effectiveCropH = cropRect.height / zoomFactor;
-        const offsetX = (cropRect.width - effectiveCropW) / 2;
-        const offsetY = (cropRect.height - effectiveCropH) / 2;
+        const zoomFactor = Math.max(1, curZoom);
+        const effectiveCropW = curCrop.width / zoomFactor;
+        const effectiveCropH = curCrop.height / zoomFactor;
+        const offsetX = (curCrop.width - effectiveCropW) / 2;
+        const offsetY = (curCrop.height - effectiveCropH) / 2;
 
-        const sx = (cropRect.x + offsetX) * scaleX;
-        const sy = (cropRect.y + offsetY) * scaleY;
+        const sx = (curCrop.x + offsetX) * scaleX;
+        const sy = (curCrop.y + offsetY) * scaleY;
         const sw = effectiveCropW * scaleX;
         const sh = effectiveCropH * scaleY;
 
@@ -183,7 +195,7 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
 
     drawCroppedFrame();
     return () => cancelAnimationFrame(animId);
-  }, [cropRect, sourceCanvasRef, sourceWidth, sourceHeight, zoomLevel]);
+  }, [sourceCanvasRef]);
 
   // Dragging logic with multi-monitor clamping (Fix for @gkillerwog2147)
   const onPointerDownDrag = (e: React.PointerEvent) => {
@@ -254,8 +266,11 @@ export const PiPFloatingWindow: React.FC<PiPFloatingWindowProps> = ({
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
     if (sourceVideoRef.current) {
-      if (isPlaying) sourceVideoRef.current.pause();
-      else sourceVideoRef.current.play();
+      if (isPlaying) {
+        sourceVideoRef.current.pause();
+      } else {
+        sourceVideoRef.current.play().catch(() => {});
+      }
     }
   };
 

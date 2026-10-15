@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { WindowInfo } from '../types';
 
 interface WindowContentViewProps {
@@ -12,21 +12,19 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
   videoRef,
   canvasRef,
 }) => {
-  const [stockPrice, setStockPrice] = useState(64820);
-  const [stockHistory, setStockHistory] = useState<number[]>([
-    64200, 64350, 64180, 64500, 64420, 64600, 64750, 64680, 64820,
-  ]);
+  const stockDataRef = useRef<{ price: number; history: number[] }>({
+    price: 64820,
+    history: [64200, 64350, 64180, 64500, 64420, 64600, 64750, 64680, 64820],
+  });
 
-  // Trading view tick animation
+  // Trading view simulated price tick without triggering React component re-renders
   useEffect(() => {
     if (windowInfo.id !== 'tradingview_app') return;
     const interval = setInterval(() => {
-      setStockPrice((prev) => {
-        const delta = (Math.random() - 0.48) * 80;
-        const next = Math.round(prev + delta);
-        setStockHistory((hist) => [...hist.slice(-25), next]);
-        return next;
-      });
+      const delta = (Math.random() - 0.48) * 80;
+      const next = Math.round(stockDataRef.current.price + delta);
+      stockDataRef.current.price = next;
+      stockDataRef.current.history = [...stockDataRef.current.history.slice(-25), next];
     }, 1200);
     return () => clearInterval(interval);
   }, [windowInfo.id]);
@@ -70,24 +68,27 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         }
 
         // Header bar
+        const currentPrice = stockDataRef.current.price;
+        const currentHistory = stockDataRef.current.history;
+
         ctx.fillStyle = '#1e222d';
         ctx.fillRect(0, 0, w, 44);
         ctx.fillStyle = '#f0f3fa';
         ctx.font = 'bold 16px sans-serif';
         ctx.fillText('BTC / USD · 1D · Coinbase (HWND: ' + windowInfo.hwnd + ')', 20, 28);
-        ctx.fillStyle = stockPrice >= 64500 ? '#089981' : '#f23645';
-        ctx.fillText(`$${stockPrice.toLocaleString()}`, 380, 28);
+        ctx.fillStyle = currentPrice >= 64500 ? '#089981' : '#f23645';
+        ctx.fillText(`$${currentPrice.toLocaleString()}`, 380, 28);
 
         // Draw candlesticks & trend
-        const len = stockHistory.length;
-        const minVal = Math.min(...stockHistory) - 100;
-        const maxVal = Math.max(...stockHistory) + 100;
+        const len = currentHistory.length;
+        const minVal = Math.min(...currentHistory) - 100;
+        const maxVal = Math.max(...currentHistory) + 100;
         const stepX = (w - 200) / Math.max(1, len);
 
         ctx.beginPath();
-        stockHistory.forEach((val, idx) => {
+        currentHistory.forEach((val: number, idx: number) => {
           const posX = 80 + idx * stepX;
-          const posY = h - 100 - ((val - minVal) / (maxVal - minVal)) * (h - 220);
+          const posY = h - 100 - ((val - minVal) / Math.max(1, maxVal - minVal)) * (h - 220);
           if (idx === 0) ctx.moveTo(posX, posY);
           else ctx.lineTo(posX, posY);
         });
@@ -96,9 +97,9 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
         ctx.stroke();
 
         // Candlestick bodies
-        stockHistory.forEach((val, idx) => {
+        currentHistory.forEach((val: number, idx: number) => {
           const posX = 80 + idx * stepX;
-          const posY = h - 100 - ((val - minVal) / (maxVal - minVal)) * (h - 220);
+          const posY = h - 100 - ((val - minVal) / Math.max(1, maxVal - minVal)) * (h - 220);
           const isGreen = idx % 2 === 0;
           ctx.fillStyle = isGreen ? '#089981' : '#f23645';
           ctx.fillRect(posX - 6, posY - 15, 12, 30);
@@ -234,7 +235,7 @@ export const WindowContentView: React.FC<WindowContentViewProps> = ({
 
     render();
     return () => cancelAnimationFrame(animId);
-  }, [windowInfo, videoRef, canvasRef, stockPrice, stockHistory]);
+  }, [windowInfo, videoRef, canvasRef]);
 
   return (
     <div className="relative w-full h-full bg-[#18181b] overflow-hidden flex items-center justify-center">

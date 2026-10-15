@@ -26,7 +26,12 @@ export const CodeExplorerModal: React.FC<CodeExplorerModalProps> = ({
   const files = activeTab === 'rust' ? RUST_FILES : ZIG_FILES;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+    >
       <div className="bg-[#1e1e22] border border-neutral-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[88vh]">
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between bg-[#18181b]">

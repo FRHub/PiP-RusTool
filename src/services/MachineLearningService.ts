@@ -77,7 +77,21 @@ class MachineLearningService {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        this.data = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.data = parsed.filter(
+            (item: any) =>
+              item &&
+              typeof item.region === 'string' &&
+              typeof item.program === 'string' &&
+              typeof item.windowWidth === 'number'
+          );
+          if (this.data.length === 0) {
+            this.data = [...INITIAL_TRAINING_DATA];
+          }
+        } else {
+          this.data = [...INITIAL_TRAINING_DATA];
+        }
       } else {
         this.data = [...INITIAL_TRAINING_DATA];
         this.saveData();
@@ -137,22 +151,24 @@ class MachineLearningService {
    * Uses weighted similarity matching across program, title tokens, and window aspect ratio/scale
    */
   public predict(windowInfo: WindowInfo): RegionPrediction {
+    const winW = Math.max(100, windowInfo.width || 1280);
+    const winH = Math.max(100, windowInfo.height || 720);
+
     if (!this.data.length) {
-      // Default fallback: 16:9 center region
-      const w = Math.round(windowInfo.width * 0.75);
+      const w = Math.round(winW * 0.75);
       const h = Math.round(w * (9 / 16));
       return {
-        top: Math.max(10, Math.round((windowInfo.height - h) / 2)),
-        left: Math.max(10, Math.round((windowInfo.width - w) / 2)),
-        width: w,
-        height: h,
+        top: Math.max(10, Math.round((winH - h) / 2)),
+        left: Math.max(10, Math.round((winW - w) / 2)),
+        width: Math.min(winW - 20, w),
+        height: Math.min(winH - 20, h),
         confidence: 0.7,
         tag: 'Default Center 16:9',
       };
     }
 
-    const targetProg = windowInfo.program.toLowerCase();
-    const targetTitle = windowInfo.title.toLowerCase();
+    const targetProg = (windowInfo.program || '').toLowerCase();
+    const targetTitle = (windowInfo.title || '').toLowerCase();
 
     // Check direct matching program
     let bestMatch: WindowData | null = null;
@@ -160,13 +176,13 @@ class MachineLearningService {
 
     for (const item of this.data) {
       let score = 0;
-      const itemProg = item.program.toLowerCase();
-      const itemTitle = item.windowTitle.toLowerCase();
+      const itemProg = (item.program || '').toLowerCase();
+      const itemTitle = (item.windowTitle || '').toLowerCase();
 
       // Program exact or partial match
-      if (itemProg === targetProg) {
+      if (itemProg && itemProg === targetProg) {
         score += 50;
-      } else if (itemProg.includes(targetProg) || targetProg.includes(itemProg)) {
+      } else if (itemProg && targetProg && (itemProg.includes(targetProg) || targetProg.includes(itemProg))) {
         score += 30;
       }
 
@@ -180,8 +196,8 @@ class MachineLearningService {
       score += commonWords * 15;
 
       // Dimension ratio closeness
-      const targetAspect = windowInfo.width / Math.max(1, windowInfo.height);
-      const itemAspect = item.windowWidth / Math.max(1, item.windowHeight);
+      const targetAspect = winW / winH;
+      const itemAspect = Math.max(1, item.windowWidth) / Math.max(1, item.windowHeight);
       const aspectDiff = Math.abs(targetAspect - itemAspect);
       if (aspectDiff < 0.1) score += 20;
       else if (aspectDiff < 0.3) score += 10;
@@ -193,53 +209,50 @@ class MachineLearningService {
     }
 
     if (bestMatch && highestScore >= 20) {
-      const parts = bestMatch.region.trim().split(/\s+/).map(Number);
+      const parts = (bestMatch.region || '').trim().split(/\s+/).map(Number);
       if (parts.length === 4 && !parts.some(isNaN)) {
         const [mTop, mLeft, mHeight, mWidth] = parts;
-        // Scale relative to current window dimensions
-        const scaleX = windowInfo.width / Math.max(1, bestMatch.windowWidth);
-        const scaleY = windowInfo.height / Math.max(1, bestMatch.windowHeight);
+        const scaleX = winW / Math.max(1, bestMatch.windowWidth);
+        const scaleY = winH / Math.max(1, bestMatch.windowHeight);
 
-        const scaledTop = Math.max(0, Math.round(mTop * scaleY));
-        const scaledLeft = Math.max(0, Math.round(mLeft * scaleX));
-        const scaledWidth = Math.min(windowInfo.width - scaledLeft, Math.round(mWidth * scaleX));
-        const scaledHeight = Math.min(windowInfo.height - scaledTop, Math.round(mHeight * scaleY));
+        const scaledW = Math.max(60, Math.min(winW, Math.round(mWidth * scaleX)));
+        const scaledH = Math.max(60, Math.min(winH, Math.round(mHeight * scaleY)));
+        const scaledLeft = Math.max(0, Math.min(winW - scaledW, Math.round(mLeft * scaleX)));
+        const scaledTop = Math.max(0, Math.min(winH - scaledH, Math.round(mTop * scaleY)));
 
         const conf = Math.min(0.99, 0.6 + highestScore / 150);
         return {
           top: scaledTop,
           left: scaledLeft,
-          height: Math.max(80, scaledHeight),
-          width: Math.max(80, scaledWidth),
+          height: scaledH,
+          width: scaledW,
           confidence: Math.round(conf * 100) / 100,
           tag: `ML Match: ${bestMatch.program}`,
         };
       }
     }
 
-    // Smart heuristic if no strong match:
-    // Video-oriented window -> 16:9 center cut
-    // Code / Doc -> editor column
+    // Heuristics
     if (targetTitle.includes('youtube') || targetTitle.includes('video') || targetTitle.includes('stream')) {
-      const w = Math.round(windowInfo.width * 0.8);
+      const w = Math.round(winW * 0.8);
       const h = Math.round(w * (9 / 16));
       return {
-        top: Math.round((windowInfo.height - h) / 2),
-        left: Math.round((windowInfo.width - w) / 2),
-        width: w,
-        height: h,
+        top: Math.max(0, Math.round((winH - h) / 2)),
+        left: Math.max(0, Math.round((winW - w) / 2)),
+        width: Math.min(winW, w),
+        height: Math.min(winH, h),
         confidence: 0.85,
         tag: 'Auto-heuristic (Video Stream)',
       };
     }
 
-    const defaultW = Math.round(windowInfo.width * 0.7);
-    const defaultH = Math.round(windowInfo.height * 0.7);
+    const defaultW = Math.round(winW * 0.7);
+    const defaultH = Math.round(winH * 0.7);
     return {
-      top: Math.round((windowInfo.height - defaultH) / 2),
-      left: Math.round((windowInfo.width - defaultW) / 2),
-      width: defaultW,
-      height: defaultH,
+      top: Math.max(0, Math.round((winH - defaultH) / 2)),
+      left: Math.max(0, Math.round((winW - defaultW) / 2)),
+      width: Math.min(winW, defaultW),
+      height: Math.min(winH, defaultH),
       confidence: 0.72,
       tag: 'Auto-heuristic (Center Region)',
     };

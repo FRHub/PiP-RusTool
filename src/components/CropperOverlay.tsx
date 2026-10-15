@@ -84,8 +84,10 @@ export const CropperOverlay: React.FC<CropperOverlayProps> = ({
     if (!activeHandle || !containerRef.current) return;
     e.preventDefault();
 
-    const scaleX = containerWidth / containerRef.current.clientWidth;
-    const scaleY = containerHeight / containerRef.current.clientHeight;
+    const clientW = Math.max(1, containerRef.current.clientWidth || 1);
+    const clientH = Math.max(1, containerRef.current.clientHeight || 1);
+    const scaleX = containerWidth / clientW;
+    const scaleY = containerHeight / clientH;
 
     const dx = (e.clientX - dragStartRef.current.startX) * scaleX;
     const dy = (e.clientY - dragStartRef.current.startY) * scaleY;
@@ -146,16 +148,25 @@ export const CropperOverlay: React.FC<CropperOverlayProps> = ({
     }
   };
 
-  // Preset aspect ratio quick application
+  // Preset aspect ratio quick application with full coordinate boundary check
   const applyPresetRatio = (ratioW: number, ratioH: number) => {
     const targetRatio = ratioW / ratioH;
-    let w = cropRect.width;
+    let w = Math.min(containerWidth, Math.max(60, cropRect.width));
     let h = Math.round(w / targetRatio);
-    if (cropRect.y + h > containerHeight) {
-      h = containerHeight - cropRect.y;
+    let x = cropRect.x;
+    let y = cropRect.y;
+
+    if (h > containerHeight) {
+      h = containerHeight;
       w = Math.round(h * targetRatio);
     }
-    onChangeCropRect(clampRect({ ...cropRect, width: w, height: h }));
+    if (x + w > containerWidth) {
+      x = Math.max(0, containerWidth - w);
+    }
+    if (y + h > containerHeight) {
+      y = Math.max(0, containerHeight - h);
+    }
+    onChangeCropRect(clampRect({ x, y, width: w, height: h }));
   };
 
   const currentRatio = (cropRect.width / Math.max(1, cropRect.height)).toFixed(2);

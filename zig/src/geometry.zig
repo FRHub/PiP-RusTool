@@ -40,10 +40,14 @@ pub const Rect = struct {
     }
 
     pub fn clampWithin(self: Rect, bounds: Rect) Rect {
-        const w = @min(self.width, bounds.width);
-        const h = @min(self.height, bounds.height);
-        const x = std.math.clamp(self.x, bounds.x, bounds.x + bounds.width - w);
-        const y = std.math.clamp(self.y, bounds.y, bounds.y + bounds.height - h);
+        const safe_bw = @max(10, bounds.width);
+        const safe_bh = @max(10, bounds.height);
+        const w = @min(self.width, safe_bw);
+        const h = @min(self.height, safe_bh);
+        const max_x = @max(bounds.x, bounds.x + safe_bw - w);
+        const max_y = @max(bounds.y, bounds.y + safe_bh - h);
+        const x = std.math.clamp(self.x, bounds.x, max_x);
+        const y = std.math.clamp(self.y, bounds.y, max_y);
         return .{ .x = x, .y = y, .width = w, .height = h };
     }
 };

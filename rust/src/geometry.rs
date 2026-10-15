@@ -43,10 +43,12 @@ impl Rect {
 
     /// Clamp bounding box inside target screen bounds safely.
     pub fn clamp_within(&self, bounds: &Rect) -> Self {
-        let w = self.width.min(bounds.width);
-        let h = self.height.min(bounds.height);
-        let x = self.x.clamp(bounds.x, bounds.x + bounds.width - w);
-        let y = self.y.clamp(bounds.y, bounds.y + bounds.height - h);
+        let w = self.width.min(bounds.width.max(10));
+        let h = self.height.min(bounds.height.max(10));
+        let max_x = (bounds.x + bounds.width - w).max(bounds.x);
+        let max_y = (bounds.y + bounds.height - h).max(bounds.y);
+        let x = self.x.clamp(bounds.x, max_x);
+        let y = self.y.clamp(bounds.y, max_y);
         Self { x, y, width: w, height: h }
     }
 }

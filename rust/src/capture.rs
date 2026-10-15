@@ -53,8 +53,7 @@ impl CapturePipeline {
     }
 
     pub fn stop(&mut self) {
-        if self.is_running.load(Ordering::SeqCst) {
-            self.is_running.store(false, Ordering::SeqCst);
+        if self.is_running.swap(false, Ordering::SeqCst) {
             if let Some(handle) = self.worker.take() {
                 let _ = handle.join();
             }

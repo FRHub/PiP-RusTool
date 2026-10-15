@@ -74,8 +74,8 @@ export const MainWindowBar: React.FC<MainWindowBarProps> = ({
         </div>
 
         {/* Center: Windows Process Selector (matching MainWindow.xaml ComboBox) */}
-        <div className="flex items-center gap-2 flex-1 max-w-xl">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0 max-w-xl">
+          <div className="relative flex-1 min-w-0">
             <select
               value={selectedWindow.id}
               onChange={(e) => {

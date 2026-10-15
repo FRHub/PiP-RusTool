@@ -50,19 +50,35 @@ export const App: React.FC = () => {
   const [isYouTubeModalOpen, setIsYouTubeModalOpen] = useState<boolean>(false);
   const [isCodeExplorerOpen, setIsCodeExplorerOpen] = useState<boolean>(false);
 
-  // Measure stage dimensions
+  // Toast ref to prevent timer race conditions
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Measure stage dimensions using ResizeObserver for precise element tracking
   useEffect(() => {
+    const el = stageContainerRef.current;
+    if (!el) return;
+
     const updateSize = () => {
-      if (stageContainerRef.current) {
-        setStageDimensions({
-          width: stageContainerRef.current.clientWidth || 1280,
-          height: stageContainerRef.current.clientHeight || 720,
-        });
-      }
+      setStageDimensions({
+        width: el.clientWidth || 1280,
+        height: el.clientHeight || 720,
+      });
     };
+
     updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateSize);
+      ro.observe(el);
+    } else {
+      window.addEventListener('resize', updateSize);
+    }
+
+    return () => {
+      if (ro) ro.disconnect();
+      else window.removeEventListener('resize', updateSize);
+    };
   }, []);
 
   // Update ML prediction whenever selected window changes
@@ -70,25 +86,29 @@ export const App: React.FC = () => {
     const pred = mlService.predict(selectedWindow);
     setPrediction(pred);
 
-    setCropRect({
-      x: pred.left,
-      y: pred.top,
-      width: pred.width,
-      height: pred.height,
-    });
+    const safeW = selectedWindow.width || 1280;
+    const safeH = selectedWindow.height || 720;
+    const w = Math.min(safeW, Math.max(60, pred.width));
+    const h = Math.min(safeH, Math.max(60, pred.height));
+    const x = Math.max(0, Math.min(safeW - w, pred.left));
+    const y = Math.max(0, Math.min(safeH - h, pred.top));
+
+    setCropRect({ x, y, width: w, height: h });
   }, [selectedWindow]);
 
   // Apply predicted region manually
   const applyPrediction = useCallback(() => {
     if (!prediction) return;
-    setCropRect({
-      x: prediction.left,
-      y: prediction.top,
-      width: prediction.width,
-      height: prediction.height,
-    });
+    const safeW = selectedWindow.width || 1280;
+    const safeH = selectedWindow.height || 720;
+    const w = Math.min(safeW, Math.max(60, prediction.width));
+    const h = Math.min(safeH, Math.max(60, prediction.height));
+    const x = Math.max(0, Math.min(safeW - w, prediction.left));
+    const y = Math.max(0, Math.min(safeH - h, prediction.top));
+
+    setCropRect({ x, y, width: w, height: h });
     showToast(`${t.aiPrediction}: ${prediction.tag} (${Math.round(prediction.confidence * 100)}%)`);
-  }, [prediction, t.aiPrediction]);
+  }, [prediction, selectedWindow, t.aiPrediction]);
 
   // Launch PiP and train ML
   const startPipMode = () => {
@@ -107,13 +127,24 @@ export const App: React.FC = () => {
     showToast(t.newSampleRecorded);
   };
 
-  // Toast notification
+  // Toast notification with race-free timer management
   const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
     setToastMessage(msg);
-    setTimeout(() => {
+    toastTimeoutRef.current = setTimeout(() => {
       setToastMessage(null);
+      toastTimeoutRef.current = null;
     }, 3200);
   };
+
+  // Cleanup toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
 
   // Keyboard hotkeys matching PiP-Tool Windows App
   useEffect(() => {
@@ -125,12 +156,31 @@ export const App: React.FC = () => {
         startPipMode();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        if (isPipActive) setIsPipActive(false);
+        // Dismiss open modals first before closing PiP
+        if (isYouTubeModalOpen) {
+          setIsYouTubeModalOpen(false);
+        } else if (isCodeExplorerOpen) {
+          setIsCodeExplorerOpen(false);
+        } else if (isMLModalOpen) {
+          setIsMLModalOpen(false);
+        } else if (isAboutModalOpen) {
+          setIsAboutModalOpen(false);
+        } else if (isPipActive) {
+          setIsPipActive(false);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPipActive, cropRect, selectedWindow]);
+  }, [
+    isPipActive,
+    cropRect,
+    selectedWindow,
+    isYouTubeModalOpen,
+    isCodeExplorerOpen,
+    isMLModalOpen,
+    isAboutModalOpen,
+  ]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#18181b] overflow-hidden select-none">
